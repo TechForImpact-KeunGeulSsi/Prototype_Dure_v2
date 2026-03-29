@@ -80,7 +80,7 @@ AI: 도감 카드 + 미션 자동 생성
 
 ```bash
 # 1. 압축 해제 후 폴더 진입
-cd dure
+cd Prototype_Dure_v2
 
 # 2. 패키지 설치
 npm install
@@ -169,7 +169,7 @@ set OPENAI_API_KEY=sk-proj-... && node server.js
 ## 프로젝트 구조
 
 ```
-dure/
+Prototype_Dure_v2/
 ├── server.js          # 백엔드 서버 (API 라우트 + AI 연동)
 ├── package.json
 ├── .env.example       # 환경변수 예시
