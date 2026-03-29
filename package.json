@@ -1,0 +1,8 @@
+{
+  "name": "dure",
+  "version": "1.0.0",
+  "description": "두레 — 마을 도감 AI 성장기록 시스템",
+  "main": "server.js",
+  "scripts": { "start": "node server.js" },
+  "dependencies": { "express": "^4.18.2" }
+}

@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>내 마을 도감 — 두레</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .view { display: none; }
+    .view.active { display: block; }
+    /* 탭 */
+    .tabs { display:flex; gap:0; border-bottom: 2px solid var(--border); margin-bottom:24px; }
+    .tab { padding:12px 20px; font-size:14px; font-weight:600; color:var(--muted); cursor:pointer; border-bottom:3px solid transparent; margin-bottom:-2px; transition:all .2s; }
+    .tab.active { color:var(--green); border-bottom-color:var(--green); }
+    /* 캐릭터 선택 */
+    .child-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+    .child-btn { display:flex; align-items:center; gap:12px; padding:14px; border:2px solid var(--border); border-radius:var(--r-sm); cursor:pointer; background:white; transition:all .2s; font-family:inherit; text-align:left; width:100%; }
+    .child-btn:hover { border-color:var(--green); background:var(--green-light); }
+    .child-btn.selected { border-color:var(--green); background:var(--green-light); }
+    /* 도감 그리드 */
+    .almanac-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:14px; }
+    /* 미션 영역 */
+    .mission-empty { text-align:center; padding:32px; color:var(--muted); font-size:13px; }
+    /* 채팅 오버레이 */
+    .chat-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:500; align-items:flex-end; }
+    .chat-overlay.open { display:flex; }
+    .chat-sheet { width:100%; max-width:700px; margin:0 auto; height:82vh; background:white; border-radius:24px 24px 0 0; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 -8px 40px rgba(0,0,0,.2); }
+    .chat-sheet-header { padding:16px 20px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:12px; flex-shrink:0; }
+    /* 진행 표시 */
+    .progress-ring { font-size:12px; color:var(--muted); margin-left:auto; }
+  </style>
+</head>
+<body>
+<nav class="nav">
+  <a href="index.html" class="nav-brand"><div class="nav-logo">🌱</div>두레</a>
+  <div class="nav-links">
+    <a href="index.html">홈</a><a href="child.html" class="active">아이</a>
+    <a href="teacher.html">선생님</a><a href="parent.html">부모님</a><a href="dashboard.html">대시보드</a>
+  </div>
+</nav>
+
+<!-- 1. 아이 선택 화면 -->
+<div class="view active" id="selectView">
+  <div class="container" style="max-width:560px;">
+    <div style="text-align:center; margin-bottom:28px; padding-top:16px;">
+      <div style="font-size:52px; margin-bottom:12px;">🌳</div>
+      <h1 style="font-size:22px; font-weight:900; margin-bottom:8px;">안녕! 나는 마루야 😊</h1>
+      <p style="font-size:14px; color:var(--muted);">오늘도 마을 도감을 채우러 왔어?<br>먼저 나한테 네가 누군지 알려줘!</p>
+    </div>
+    <div class="card">
+      <label class="label">👦 나를 선택해줘</label>
+      <div class="child-grid" id="childGrid"></div>
+      <button class="btn btn-primary" style="width:100%; margin-top:16px; font-size:15px; padding:14px;" id="selectBtn" disabled onclick="enterMain()">
+        내 도감 보러 가기 🗺️
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- 2. 메인 (도감/캐릭터/미션) -->
+<div class="view" id="mainView">
+  <div class="container">
+    <!-- 상단 프로필 -->
+    <div class="card" style="margin-bottom:24px; display:flex; align-items:center; gap:20px; flex-wrap:wrap;">
+      <div class="character-box" style="flex-shrink:0; min-width:140px;">
+        <div class="character-emoji" id="charEmoji">🦁</div>
+        <div style="font-size:14px; font-weight:700;" id="charName">—</div>
+        <div style="font-size:11px; color:var(--muted);" id="charVillage">—</div>
+        <div class="character-items" id="charItems"></div>
+      </div>
+      <div style="flex:1; min-width:200px;">
+        <div style="display:flex; align-items:center; gap:10px; margin-bottom:8px;">
+          <span style="font-size:22px; font-weight:900;" id="cardCount">0</span>
+          <span style="font-size:13px; color:var(--muted);">장의 카드 수집</span>
+          <span style="font-size:22px; font-weight:900; margin-left:16px;" id="missionCount">0</span>
+          <span style="font-size:13px; color:var(--muted);">개 미션 완료</span>
+        </div>
+        <div class="prog-bar"><div class="prog-fill" id="progFill" style="width:0%"></div></div>
+        <div style="font-size:11px; color:var(--muted); margin-top:4px;" id="progLabel">도감을 채워나가자!</div>
+        <button class="btn btn-secondary btn-sm" style="margin-top:12px;" onclick="showSelectView()">← 다른 아이</button>
+      </div>
+    </div>
+
+    <!-- 탭 -->
+    <div class="tabs">
+      <div class="tab active" onclick="switchTab('almanac', this)">📖 내 도감</div>
+      <div class="tab" onclick="switchTab('mission', this)">🎯 미션</div>
+      <div class="tab" onclick="switchTab('world', this)">🌍 다른 마을 도감</div>
+    </div>
+
+    <!-- 내 도감 탭 -->
+    <div id="tabAlmanac">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
+        <p style="font-size:13px; color:var(--muted);">마루와 대화를 완료하면 카드가 채워져요</p>
+        <button class="btn btn-primary btn-sm" onclick="openMissionChat()">+ 마루와 대화하기</button>
+      </div>
+      <div class="almanac-grid" id="myAlmanacGrid">
+        <div class="empty"><div class="ico">📖</div><h3>도감이 비어있어요</h3><p>미션을 완료하면 카드가 생겨요!</p></div>
+      </div>
+    </div>
+
+    <!-- 미션 탭 -->
+    <div id="tabMission" style="display:none;">
+      <div id="missionList"></div>
+    </div>
+
+    <!-- 다른 마을 탭 -->
+    <div id="tabWorld" style="display:none;">
+      <div class="vtabs" id="worldVtabs"></div>
+      <div class="almanac-grid" id="worldAlmanacGrid">
+        <div class="empty"><div class="ico">🌍</div><h3>불러오는 중...</h3></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 채팅 오버레이 -->
+<div class="chat-overlay" id="chatOverlay" onclick="handleOverlayClick(event)">
+  <div class="chat-sheet">
+    <div class="chat-sheet-header">
+      <div class="maru-av">🌳</div>
+      <div>
+        <div style="font-weight:700; font-size:14px;">마루 <span style="font-size:11px; font-weight:400; color:var(--green);">● 대화 중</span></div>
+        <div style="font-size:11px; color:var(--muted);" id="chatSubtitle">—</div>
+      </div>
+      <div class="progress-ring" id="chatProgress">0/5</div>
+      <button onclick="closeChat()" style="margin-left:8px; background:none; border:none; font-size:20px; cursor:pointer; color:var(--muted);">✕</button>
+    </div>
+    <div class="chat-area" id="chatArea">
+      <div class="typing" id="typing"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
+    </div>
+    <div class="chat-bottom">
+      <div class="reward-banner" id="rewardBanner"></div>
+      <div class="chat-input-row">
+        <input type="text" class="chat-input" id="chatInput" placeholder="마루에게 오늘 이야기를 해줘..." maxlength="300">
+        <button class="send-btn" id="sendBtn" onclick="sendMsg()">↑</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+let me = null, messages = [], turnCount = 0, chatActivity = null;
+const ACT_ICONS = {'목공수업':'🪵','생태교실':'🌿','마을탐험':'🗺️','음반제작':'🎵','두부만들기':'🫘','달리기훈련':'🏃','엄빠학교':'📚','플로깅':'🌍','어르신 말벗':'👴'};
+
+async function init() {
+  const children = await fetch('/api/children').then(r=>r.json());
+  const grid = document.getElementById('childGrid');
+  children.forEach(c => {
+    const btn = document.createElement('button');
+    btn.className = 'child-btn';
+    btn.innerHTML = `<span style="font-size:26px">${c.emoji}</span><div><div style="font-weight:700;font-size:14px">${c.name}</div><div style="font-size:11px;color:var(--muted)">${c.grade} · ${c.village}</div></div>`;
+    btn.onclick = () => { document.querySelectorAll('.child-btn').forEach(b=>b.classList.remove('selected')); btn.classList.add('selected'); me = c; document.getElementById('selectBtn').disabled = false; };
+    grid.appendChild(btn);
+  });
+}
+
+async function enterMain() {
+  document.getElementById('selectView').classList.remove('active');
+  document.getElementById('mainView').classList.add('active');
+  document.getElementById('mainView').style.display = 'block';
+
+  document.getElementById('charEmoji').textContent = me.emoji;
+  document.getElementById('charName').textContent = me.name;
+  document.getElementById('charVillage').textContent = me.grade + ' · ' + me.village;
+
+  // 아이템
+  const itemsEl = document.getElementById('charItems');
+  itemsEl.innerHTML = (me.items||[]).map(it => {
+    const icon = it.split(' ')[0];
+    return `<div class="character-item" title="${it}">${icon}</div>`;
+  }).join('') || '<div style="font-size:12px;color:var(--muted);margin-top:8px">아직 아이템이 없어요</div>';
+
+  await loadMyAlmanac();
+  await loadMissions();
+  initWorldTabs();
+}
+
+async function loadMyAlmanac() {
+  const cards = await fetch(`/api/cards?childId=${me.id}`).then(r=>r.json());
+  const grid = document.getElementById('myAlmanacGrid');
+  const done = cards.filter(c=>!c.pending);
+
+  document.getElementById('cardCount').textContent = done.length;
+  document.getElementById('missionCount').textContent = me.completedMissions || 0;
+  const pct = Math.min(Math.round(done.length / 10 * 100), 100);
+  document.getElementById('progFill').style.width = pct + '%';
+  document.getElementById('progLabel').textContent = done.length >= 10 ? '🎉 도감 10장 달성!' : `도전! 10장까지 ${10 - done.length}장 남았어요`;
+
+  if (done.length === 0) { grid.innerHTML = '<div class="empty"><div class="ico">📖</div><h3>아직 카드가 없어요</h3><p>미션을 완료하면 카드가 생겨요!</p></div>'; return; }
+  grid.innerHTML = done.map(c => `
+    <div class="almanac-card pop">
+      <span class="card-emoji">${c.emoji||'⭐'}</span>
+      <div class="card-name">${c.cardName}</div>
+      <div class="card-desc">${c.cardDesc}</div>
+      ${c.childQuote ? `<div class="card-quote">"${c.childQuote}"</div>` : ''}
+      <div class="card-meta">${c.date} · ${c.activity}</div>
+    </div>`).join('');
+}
+
+async function loadMissions() {
+  const missions = await fetch(`/api/missions/${me.id}`).then(r=>r.json());
+  const el = document.getElementById('missionList');
+  if (missions.length === 0) { el.innerHTML = '<div class="mission-empty">새 미션은 선생님이 활동을 기록하면 생겨요! 🎯</div>'; return; }
+  el.innerHTML = missions.map(m => `
+    <div class="mission-card ${m.completed ? 'done' : ''}">
+      <div class="mission-title">${ACT_ICONS[m.activity]||'⭐'} ${m.activity} 미션 ${m.completed ? '✅' : '🎯'}</div>
+      <div class="mission-text">${m.mission}</div>
+      <div class="mission-reward">🎁 보상: ${m.reward}</div>
+      ${!m.completed ? `<button class="btn btn-primary btn-sm" style="margin-top:10px" onclick="startMissionChat('${m.activity}','${m.mission}')">마루에게 말하기</button>` : '<div style="font-size:12px;color:var(--green);font-weight:600;margin-top:8px">✅ 완료!</div>'}
+    </div>`).join('');
+}
+
+function initWorldTabs() {
+  fetch('/api/villages').then(r=>r.json()).then(villages => {
+    const tabs = document.getElementById('worldVtabs');
+    tabs.innerHTML = ['전체', ...villages].map((v,i) => `<div class="vtab ${i===0?'active':''}" onclick="loadWorld('${v}',this)">${v==='전체'?'🌍 전체':v}</div>`).join('');
+    loadWorld('전체', tabs.querySelector('.vtab'));
+  });
+}
+
+async function loadWorld(village, el) {
+  document.querySelectorAll('.vtab').forEach(t=>t.classList.remove('active'));
+  if(el) el.classList.add('active');
+  const url = village === '전체' ? '/api/cards' : `/api/cards?village=${encodeURIComponent(village)}`;
+  const cards = await fetch(url).then(r=>r.json());
+  const grid = document.getElementById('worldAlmanacGrid');
+  const others = cards.filter(c => !c.pending && c.childId !== me?.id);
+  if (others.length === 0) { grid.innerHTML = '<div class="empty"><div class="ico">🌍</div><h3>아직 기록이 없어요</h3></div>'; return; }
+  grid.innerHTML = others.map(c => `
+    <div class="almanac-card">
+      <span class="card-emoji">${c.emoji||'⭐'}</span>
+      <div class="card-name">${c.cardName}</div>
+      <div class="card-desc">${c.cardDesc}</div>
+      ${c.childQuote ? `<div class="card-quote">"${c.childQuote}"</div>` : ''}
+      <div class="card-meta">${c.child?.emoji||''} ${c.child?.name||'?'} · ${c.village} · ${c.date}</div>
+    </div>`).join('');
+}
+
+function switchTab(name, el) {
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('tabAlmanac').style.display = name==='almanac'?'block':'none';
+  document.getElementById('tabMission').style.display = name==='mission'?'block':'none';
+  document.getElementById('tabWorld').style.display = name==='world'?'block':'none';
+}
+
+async function startMissionChat(activity, mission) {
+  chatActivity = activity;
+  messages = []; turnCount = 0;
+  document.getElementById('chatSubtitle').textContent = `${me.name} · ${activity}`;
+  document.getElementById('chatProgress').textContent = '0/5';
+  document.getElementById('chatOverlay').classList.add('open');
+  document.getElementById('rewardBanner').classList.remove('show');
+  document.getElementById('chatInput').disabled = false;
+  document.getElementById('sendBtn').disabled = false;
+
+  // 미션 텍스트를 첫 메시지로
+  clearChat();
+  addMsg('ai', `안녕 ${me.name}야! 오늘 ${activity} 미션이야 🎯\n\n"${mission}"\n\n어떤 일이 있었는지 말해줘! 😊`);
+  messages.push({ role: 'assistant', content: `미션: ${mission}` });
+}
+
+async function openMissionChat() {
+  // 미션 없이 그냥 대화 시작 - 활동 선택
+  const acts = await fetch('/api/activities').then(r=>r.json());
+  const act = prompt('어떤 활동에 대해 이야기할까요?\n' + acts.map((a,i)=>`${i+1}. ${a}`).join('\n') + '\n\n번호를 입력하거나 이름을 직접 입력해요');
+  if (!act) return;
+  const selected = acts[parseInt(act)-1] || act;
+  chatActivity = selected;
+  messages = []; turnCount = 0;
+  document.getElementById('chatSubtitle').textContent = `${me.name} · ${selected}`;
+  document.getElementById('chatProgress').textContent = '0/5';
+  document.getElementById('chatOverlay').classList.add('open');
+  document.getElementById('rewardBanner').classList.remove('show');
+  document.getElementById('chatInput').disabled = false;
+  document.getElementById('sendBtn').disabled = false;
+  clearChat();
+
+  showTyping();
+  try {
+    const r = await fetch('/api/chat/start', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ childName: me.name, activity: selected }) });
+    const d = await r.json();
+    hideTyping();
+    addMsg('ai', d.content);
+    messages.push({ role: 'assistant', content: d.content });
+  } catch { hideTyping(); addMsg('ai', `안녕 ${me.name}야! 오늘 ${selected} 어땠어? 😊`); }
+}
+
+async function sendMsg() {
+  const inp = document.getElementById('chatInput');
+  const txt = inp.value.trim();
+  if (!txt || document.getElementById('sendBtn').disabled) return;
+  inp.value = '';
+  addMsg('user', txt);
+  messages.push({ role: 'user', content: txt });
+  turnCount++;
+  document.getElementById('chatProgress').textContent = `${turnCount}/5`;
+  document.getElementById('sendBtn').disabled = true;
+  showTyping();
+
+  if (turnCount >= 5) {
+    hideTyping();
+    addMsg('ai', `오늘 이야기 잘 들었어! 기록 저장할게 📝`);
+    document.getElementById('chatInput').disabled = true;
+    await saveConv();
+    return;
+  }
+
+  try {
+    const r = await fetch('/api/chat', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ messages, activity: chatActivity, childName: me.name }) });
+    const d = await r.json();
+    hideTyping();
+    addMsg('ai', d.content);
+    messages.push({ role: 'assistant', content: d.content });
+  } catch { hideTyping(); addMsg('ai', '잠깐, 생각 중이야... 😊'); }
+  finally { document.getElementById('sendBtn').disabled = false; }
+}
+
+async function saveConv() {
+  try {
+    const r = await fetch('/api/conversations/save', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ childId: me.id, activity: chatActivity, messages }) });
+    const d = await r.json();
+    if (d.reward) {
+      const banner = document.getElementById('rewardBanner');
+      banner.textContent = `🎉 미션 완료! ${d.reward} 획득!`;
+      banner.classList.add('show');
+      me.items = me.items || [];
+      me.items.push(d.reward);
+    }
+    showToast('✅ 도감 카드가 저장됐어!', 'success');
+    setTimeout(() => { closeChat(); loadMyAlmanac(); loadMissions(); enterMain(); }, 2000);
+  } catch { showToast('저장 오류가 발생했어요', ''); }
+}
+
+document.getElementById('chatInput').addEventListener('keydown', e => { if (e.key==='Enter'&&!e.shiftKey) { e.preventDefault(); sendMsg(); } });
+
+function addMsg(role, content) {
+  const area = document.getElementById('chatArea');
+  const typing = document.getElementById('typing');
+  const g = document.createElement('div');
+  g.className = 'msg-group ' + role;
+  const meta = document.createElement('div');
+  meta.className = 'msg-meta' + (role==='user'?' ' : '');
+  meta.style.textAlign = role==='user' ? 'right' : 'left';
+  meta.textContent = role==='ai' ? '🌳 마루' : me.name;
+  const b = document.createElement('div');
+  b.className = 'bubble ' + role;
+  b.style.whiteSpace = 'pre-wrap';
+  b.textContent = content;
+  g.appendChild(meta); g.appendChild(b);
+  area.insertBefore(g, typing);
+  area.scrollTop = area.scrollHeight;
+}
+function clearChat() { const a = document.getElementById('chatArea'); a.querySelectorAll('.msg-group').forEach(el=>el.remove()); }
+function showTyping() { document.getElementById('typing').classList.add('show'); document.getElementById('chatArea').scrollTop = 99999; }
+function hideTyping() { document.getElementById('typing').classList.remove('show'); }
+function closeChat() { document.getElementById('chatOverlay').classList.remove('open'); }
+function handleOverlayClick(e) { if (e.target === document.getElementById('chatOverlay')) closeChat(); }
+function showSelectView() { document.getElementById('mainView').style.display='none'; document.getElementById('mainView').classList.remove('active'); document.getElementById('selectView').classList.add('active'); }
+function showToast(msg, type='') { const t=document.getElementById('toast'); t.textContent=msg; t.className=`toast ${type} show`; setTimeout(()=>t.className='toast',3000); }
+
+init();
+</script>
+</body></html>

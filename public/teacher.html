@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>활동 기록 — 두레 선생님</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .layout { display:grid; grid-template-columns:1fr 380px; gap:24px; max-width:1080px; margin:0 auto; padding:32px 24px; }
+    .side-panel { position:sticky; top:80px; height:fit-content; display:flex; flex-direction:column; gap:16px; }
+    .result-box { background:linear-gradient(135deg,#E1F5EE,#FEF3DC); border:2px solid var(--green); border-radius:var(--r); padding:20px; display:none; }
+    .result-box.show { display:block; animation:fadeIn .4s ease; }
+    .result-card-preview { background:white; border-radius:var(--r-sm); padding:14px; margin-top:12px; border:1px solid var(--border); }
+    .result-card-preview .rce { font-size:28px; }
+    .result-card-preview .rcn { font-weight:700; font-size:15px; margin:6px 0 4px; }
+    .result-card-preview .rcd { font-size:12px; color:var(--muted); line-height:1.5; margin-bottom:8px; }
+    .mission-preview { background:var(--amber-light); border-radius:var(--r-sm); padding:12px; font-size:12px; border:1px solid var(--amber); }
+    .mission-preview .mt { font-weight:700; margin-bottom:4px; }
+    .recent-item { padding:12px; border-radius:var(--r-sm); border:1px solid var(--border); background:white; margin-bottom:8px; }
+    .recent-item-title { font-weight:700; font-size:13px; margin-bottom:3px; }
+    .recent-item-meta { font-size:11px; color:var(--muted); margin-bottom:6px; }
+    .section-label { font-size:13px; font-weight:700; color:var(--green-dark); margin-bottom:10px; display:flex; align-items:center; gap:6px; }
+    .form-sec { margin-bottom:22px; }
+    @media(max-width:768px){ .layout{grid-template-columns:1fr;} .side-panel{position:static;} }
+  </style>
+</head>
+<body>
+<nav class="nav">
+  <a href="index.html" class="nav-brand"><div class="nav-logo">🌱</div>두레</a>
+  <div class="nav-links">
+    <a href="index.html">홈</a><a href="child.html">아이</a>
+    <a href="teacher.html" class="active">선생님</a><a href="parent.html">부모님</a><a href="dashboard.html">대시보드</a>
+  </div>
+</nav>
+
+<div class="layout">
+  <!-- 왼쪽: 입력 폼 -->
+  <div>
+    <div class="page-header" style="margin-bottom:24px;">
+      <h1 style="font-size:24px;font-weight:900;margin-bottom:4px;">📋 오늘 활동 기록</h1>
+      <p style="font-size:13px;color:var(--muted);">태그만 입력하면 AI가 도감 카드와 미션을 자동으로 만들어드려요</p>
+    </div>
+
+    <div class="card card-lg fade-in">
+      <!-- 날짜 · 마을 -->
+      <div class="form-sec">
+        <div class="grid-2" style="gap:12px;">
+          <div>
+            <label class="label">📅 날짜</label>
+            <input type="date" class="input" id="dateInput">
+          </div>
+          <div>
+            <label class="label">📍 마을</label>
+            <select class="select" id="villageSelect">
+              <option value="">마을 선택</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- 활동 선택 -->
+      <div class="form-sec">
+        <div class="section-label">🎯 오늘의 활동</div>
+        <div class="sel-grid" id="actGrid"></div>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- 참여 아이 -->
+      <div class="form-sec">
+        <div class="section-label">👦 참여 아이 선택</div>
+        <div id="childList"></div>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- 역량 태그 -->
+      <div class="form-sec">
+        <div class="section-label">⭐ 오늘 보인 역량</div>
+        <div class="tags-row" id="tagList"></div>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- 메모 -->
+      <div class="form-sec">
+        <label class="label">📝 간단 메모 (선택)</label>
+        <textarea class="textarea" id="noteInput" placeholder="오늘 특별히 기억할 만한 순간이 있었다면 적어주세요..."></textarea>
+      </div>
+
+      <!-- 제출 -->
+      <button class="btn btn-primary btn-lg" style="width:100%;" id="submitBtn" onclick="submitRecord()">
+        ✨ AI 도감 카드 + 미션 자동 생성
+      </button>
+    </div>
+  </div>
+
+  <!-- 오른쪽: 결과 + 최근 기록 -->
+  <div class="side-panel">
+    <!-- AI 생성 결과 -->
+    <div class="result-box" id="resultBox">
+      <div style="font-weight:700;font-size:14px;margin-bottom:4px;">✅ AI가 자동으로 만들었어요!</div>
+      <div style="font-size:12px;color:var(--green-dark);margin-bottom:12px;">참여 아이들에게 미션이 전달됐어요</div>
+      <div class="result-card-preview" id="resultCard"></div>
+      <div class="mission-preview" style="margin-top:10px;" id="resultMission"></div>
+      <div style="margin-top:10px;font-size:11px;color:var(--muted);" id="resultItems"></div>
+    </div>
+
+    <!-- 최근 기록 -->
+    <div class="card card-sm">
+      <div class="section-label" style="margin-bottom:12px;">📂 최근 활동 기록</div>
+      <div id="recentList"><div style="text-align:center;padding:20px;color:var(--muted);font-size:13px;">불러오는 중...</div></div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+let selActivity = null, selParticipants = new Set(), selTags = new Set();
+let allChildren = [];
+const ACT_ICONS = {'목공수업':'🪵','생태교실':'🌿','마을탐험':'🗺️','음반제작':'🎵','두부만들기':'🫘','달리기훈련':'🏃','엄빠학교':'📚','플로깅':'🌍','어르신 말벗':'👴'};
+
+async function init() {
+  document.getElementById('dateInput').value = new Date().toISOString().split('T')[0];
+  const [children, activities, villages, tagMap] = await Promise.all([
+    fetch('/api/children').then(r=>r.json()),
+    fetch('/api/activities').then(r=>r.json()),
+    fetch('/api/villages').then(r=>r.json()),
+    fetch('/api/activity-tags').then(r=>r.json()),
+  ]);
+  allChildren = children;
+
+  // 마을
+  villages.forEach(v => {
+    const opt = document.createElement('option');
+    opt.value = v; opt.textContent = v;
+    document.getElementById('villageSelect').appendChild(opt);
+  });
+
+  // 활동
+  activities.forEach(act => {
+    const el = document.createElement('div');
+    el.className = 'sel-card';
+    el.innerHTML = `<span class="ico">${ACT_ICONS[act]||'⭐'}</span>${act}`;
+    el.onclick = () => {
+      document.querySelectorAll('.sel-card').forEach(c=>c.classList.remove('active'));
+      el.classList.add('active');
+      selActivity = act;
+      // 추천 태그 자동 선택
+      const rec = tagMap[act]?.tags || [];
+      document.querySelectorAll('.tag').forEach(t => {
+        if (rec.includes(t.dataset.tag)) { t.classList.add('active'); selTags.add(t.dataset.tag); }
+      });
+    };
+    document.getElementById('actGrid').appendChild(el);
+  });
+
+  // 아이
+  children.forEach(c => {
+    const el = document.createElement('div');
+    el.className = 'check-item';
+    el.innerHTML = `<span style="font-size:22px">${c.emoji}</span><div style="flex:1"><div style="font-weight:700;font-size:14px">${c.name}</div><div style="font-size:11px;color:var(--muted)">${c.grade} · ${c.village}</div></div><div class="check-box"></div>`;
+    el.onclick = () => {
+      if (selParticipants.has(c.id)) { selParticipants.delete(c.id); el.classList.remove('checked'); }
+      else { selParticipants.add(c.id); el.classList.add('checked'); }
+    };
+    document.getElementById('childList').appendChild(el);
+  });
+
+  // 역량 태그
+  const tags = ['협력','창의','자연탐구','문제해결','표현','신체활동','AI활용'];
+  tags.forEach(tag => {
+    const el = document.createElement('div');
+    el.className = 'tag'; el.textContent = tag; el.dataset.tag = tag;
+    el.onclick = () => {
+      if (selTags.has(tag)) { selTags.delete(tag); el.classList.remove('active'); }
+      else { selTags.add(tag); el.classList.add('active'); }
+    };
+    document.getElementById('tagList').appendChild(el);
+  });
+
+  loadRecent();
+}
+
+async function loadRecent() {
+  const cards = await fetch('/api/cards').then(r=>r.json());
+  const el = document.getElementById('recentList');
+  const recent = cards.filter(c=>!c.pending).slice(0,8);
+  if (!recent.length) { el.innerHTML = '<div style="text-align:center;padding:16px;color:var(--muted);font-size:12px">아직 기록이 없어요</div>'; return; }
+  el.innerHTML = recent.map(c => `
+    <div class="recent-item">
+      <div class="recent-item-title">${ACT_ICONS[c.activity]||'⭐'} ${c.cardName}</div>
+      <div class="recent-item-meta">${c.date} · ${c.village} · ${c.child?.name||'?'}</div>
+      <div>${c.tags.map(t=>`<span class="badge">${t}</span>`).join(' ')}</div>
+    </div>`).join('');
+}
+
+async function submitRecord() {
+  if (!selActivity) { showToast('활동을 선택해주세요', ''); return; }
+  if (selParticipants.size === 0) { showToast('참여 아이를 선택해주세요', ''); return; }
+  if (!document.getElementById('villageSelect').value) { showToast('마을을 선택해주세요', ''); return; }
+
+  const btn = document.getElementById('submitBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spinner" style="width:16px;height:16px;margin-right:8px;"></div> AI가 카드 생성 중...';
+
+  try {
+    const r = await fetch('/api/cards/generate', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        activity: selActivity,
+        village: document.getElementById('villageSelect').value,
+        childIds: [...selParticipants],
+        tags: [...selTags],
+        note: document.getElementById('noteInput').value,
+        date: document.getElementById('dateInput').value,
+      })
+    });
+    const data = await r.json();
+    const g = data.generated;
+
+    // 결과 표시
+    document.getElementById('resultCard').innerHTML = `
+      <div class="rce">${ACT_ICONS[selActivity]||'⭐'}</div>
+      <div class="rcn">${g.cardName}</div>
+      <div class="rcd">${g.cardDesc}</div>
+      <div>${[...selTags].map(t=>`<span class="badge">${t}</span>`).join(' ')}</div>`;
+    document.getElementById('resultMission').innerHTML = `
+      <div class="mt">🎯 자동 생성된 미션</div>
+      <div>${g.mission}</div>
+      <div style="margin-top:6px;font-weight:600;color:#92550A">🎁 보상: ${g.reward}</div>`;
+    document.getElementById('resultItems').textContent = `참여: ${data.cards.map(c=>c.childName).join(', ')}`;
+    document.getElementById('resultBox').classList.add('show');
+
+    showToast('✅ 카드와 미션이 생성됐어요!', 'success');
+    loadRecent();
+
+    // 폼 리셋
+    selActivity = null; selParticipants = new Set(); selTags = new Set();
+    document.querySelectorAll('.sel-card,.check-item,.tag').forEach(el=>el.classList.remove('active','checked'));
+    document.getElementById('noteInput').value = '';
+    document.getElementById('villageSelect').value = '';
+  } catch(e) {
+    showToast('오류가 발생했어요. 다시 시도해주세요.', '');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '✨ AI 도감 카드 + 미션 자동 생성';
+  }
+}
+
+function showToast(msg, type='') { const t=document.getElementById('toast'); t.textContent=msg; t.className=`toast ${type} show`; setTimeout(()=>t.className='toast',3000); }
+init();
+</script>
+</body></html>
